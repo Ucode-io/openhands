@@ -9,6 +9,7 @@ import { ChatInputGrip } from "./components/chat-input-grip";
 import { ChatInputContainer } from "./components/chat-input-container";
 import { HiddenFileInput } from "./components/hidden-file-input";
 import { useConversationStore } from "#/stores/conversation-store";
+import { NotionTask } from "#/api/notion-service/notion-service.api";
 
 export interface CustomChatInputProps {
   disabled?: boolean;
@@ -20,6 +21,8 @@ export interface CustomChatInputProps {
   onFilesPaste?: (files: File[]) => void;
   className?: React.HTMLAttributes<HTMLDivElement>["className"];
   buttonClassName?: React.HTMLAttributes<HTMLButtonElement>["className"];
+  selectedNotionTask?: NotionTask | null;
+  onClearNotionTask?: () => void;
 }
 
 export function CustomChatInput({
@@ -32,6 +35,8 @@ export function CustomChatInput({
   onFilesPaste,
   className = "",
   buttonClassName = "",
+  selectedNotionTask,
+  onClearNotionTask,
 }: CustomChatInputProps) {
   const {
     submittedMessage,
@@ -149,6 +154,8 @@ export function CustomChatInput({
           onKeyDown={(e) => handleKeyDown(e, isDisabled, handleSubmit)}
           onFocus={handleFocus}
           onBlur={handleBlur}
+          selectedNotionTask={selectedNotionTask}
+          onClearNotionTask={onClearNotionTask}
         />
       </div>
     </div>

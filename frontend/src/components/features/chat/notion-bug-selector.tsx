@@ -10,6 +10,8 @@ import { I18nKey } from "#/i18n/declaration";
 
 interface NotionBugSelectorProps {
   onSelectTask: (task: NotionTask, message: string) => void;
+  selectedTask: NotionTask | null;
+  onClearTask: () => void;
   className?: string;
 }
 
@@ -19,21 +21,22 @@ interface NotionBugSelectorProps {
  */
 export function NotionBugSelector({
   onSelectTask,
+  selectedTask,
+  onClearTask,
   className,
 }: NotionBugSelectorProps) {
   const { t } = useTranslation();
   const { data: settings } = useSettings();
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedTask, setSelectedTask] = useState<NotionTask | null>(null);
 
   // Check if Notion is configured
   const isNotionConfigured = settings?.notion_api_key_set === true;
 
-  // Fetch tasks when dropdown is open
-  const { data: tasks = [], isLoading, error } = useNotionTasks(undefined, isOpen && isNotionConfigured);
+  // Fetch only "Not started" tasks from the API when dropdown is open
+  const { data: tasks = [], isLoading, error } = useNotionTasks("Not started", isOpen && isNotionConfigured);
 
-  // Filter tasks based on search query
+  // Apply search query to the already-filtered tasks
   const filteredTasks = useMemo(() => {
     if (!searchQuery.trim()) {
       return tasks;
@@ -60,7 +63,6 @@ export function NotionBugSelector({
   // Handle task selection
   const handleSelectTask = useCallback(
     (task: NotionTask) => {
-      setSelectedTask(task);
       setIsOpen(false);
       setSearchQuery("");
       const message = generateTaskMessage(task);
@@ -68,11 +70,6 @@ export function NotionBugSelector({
     },
     [onSelectTask, generateTaskMessage],
   );
-
-  // Clear selection
-  const handleClearSelection = useCallback(() => {
-    setSelectedTask(null);
-  }, []);
 
   // Don't render if Notion is not configured
   if (!isNotionConfigured) {
@@ -103,20 +100,6 @@ export function NotionBugSelector({
           )}
         />
       </button>
-
-      {/* Selected Task Pill */}
-      {selectedTask && (
-        <div className="absolute left-0 top-full mt-1 flex items-center gap-2 px-2 py-1 rounded-md bg-blue-500/20 border border-blue-500/30 text-xs text-blue-300">
-          <span className="truncate max-w-[150px]">{selectedTask.title}</span>
-          <button
-            type="button"
-            onClick={handleClearSelection}
-            className="p-0.5 hover:bg-blue-500/30 rounded"
-          >
-            <FiX className="w-3 h-3" />
-          </button>
-        </div>
-      )}
 
       {/* Dropdown Panel - opens upward */}
       {isOpen && (

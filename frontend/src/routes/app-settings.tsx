@@ -8,6 +8,7 @@ import { DEFAULT_SETTINGS } from "#/services/settings";
 import { BrandButton } from "#/components/features/settings/brand-button";
 import { SettingsSwitch } from "#/components/features/settings/settings-switch";
 import { SettingsInput } from "#/components/features/settings/settings-input";
+import { SettingsDropdownInput } from "#/components/features/settings/settings-dropdown-input";
 import { I18nKey } from "#/i18n/declaration";
 import { LanguageInput } from "#/components/features/settings/app-settings/language-input";
 import { handleCaptureConsent } from "#/utils/handle-capture-consent";
@@ -50,6 +51,8 @@ function AppSettingsScreen() {
     React.useState(false);
   const [gitUserEmailHasChanged, setGitUserEmailHasChanged] =
     React.useState(false);
+  const [packageManagerHasChanged, setPackageManagerHasChanged] =
+    React.useState(false);
 
   const formAction = (formData: FormData) => {
     const languageLabel = formData.get("language-input")?.toString();
@@ -81,6 +84,9 @@ function AppSettingsScreen() {
     const gitUserEmail =
       formData.get("git-user-email-input")?.toString() ||
       DEFAULT_SETTINGS.git_user_email;
+    const packageManager =
+      (formData.get("package-manager-input")?.toString() as "npm" | "yarn" | "pnpm") ||
+      DEFAULT_SETTINGS.package_manager;
 
     saveSettings(
       {
@@ -92,6 +98,7 @@ function AppSettingsScreen() {
         max_budget_per_task: maxBudgetPerTask,
         git_user_name: gitUserName,
         git_user_email: gitUserEmail,
+        package_manager: packageManager,
       },
       {
         onSuccess: () => {
@@ -110,6 +117,7 @@ function AppSettingsScreen() {
           setMaxBudgetPerTaskHasChanged(false);
           setGitUserNameHasChanged(false);
           setGitUserEmailHasChanged(false);
+          setPackageManagerHasChanged(false);
         },
       },
     );
@@ -170,6 +178,11 @@ function AppSettingsScreen() {
     setGitUserEmailHasChanged(value !== currentValue);
   };
 
+  const checkIfPackageManagerHasChanged = (key: React.Key | null) => {
+    const currentValue = settings?.package_manager || "npm";
+    setPackageManagerHasChanged((key as string) !== currentValue);
+  };
+
   const formIsClean =
     !languageInputHasChanged &&
     !analyticsSwitchHasChanged &&
@@ -178,7 +191,8 @@ function AppSettingsScreen() {
     !solvabilityAnalysisSwitchHasChanged &&
     !maxBudgetPerTaskHasChanged &&
     !gitUserNameHasChanged &&
-    !gitUserEmailHasChanged;
+    !gitUserEmailHasChanged &&
+    !packageManagerHasChanged;
 
   const shouldBeLoading = !settings || isLoading || isPending;
 
@@ -283,6 +297,28 @@ function AppSettingsScreen() {
                 className="w-full max-w-[680px]"
               />
             </div>
+          </div>
+
+          <div className="border-t border-t-tertiary pt-6 mt-2">
+            <h3 className="text-lg font-medium mb-2">
+              Package Manager
+            </h3>
+            <p className="text-xs mb-4 text-zinc-400">
+              Your preferred package manager for new projects. For existing projects, the agent will automatically detect the package manager from lock files (yarn.lock, package-lock.json, or pnpm-lock.yaml).
+            </p>
+            <SettingsDropdownInput
+              testId="package-manager-input"
+              name="package-manager-input"
+              label="Package Manager"
+              items={[
+                { key: "npm", label: "npm" },
+                { key: "yarn", label: "yarn" },
+                { key: "pnpm", label: "pnpm" },
+              ]}
+              defaultSelectedKey={settings.package_manager || "npm"}
+              onSelectionChange={checkIfPackageManagerHasChanged}
+              wrapperClassName="w-full max-w-[680px]"
+            />
           </div>
         </div>
       )}

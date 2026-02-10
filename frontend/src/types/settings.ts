@@ -65,6 +65,8 @@ export type Settings = {
   email_verified?: boolean;
   git_user_name?: string;
   git_user_email?: string;
+  // Package manager preference (npm or yarn)
+  package_manager?: "npm" | "yarn" | "pnpm";
   v1_enabled?: boolean;
   // Notion integration
   notion_api_key_set?: boolean;

@@ -56,6 +56,8 @@ class Settings(BaseModel):
     email_verified: bool | None = None
     git_user_name: str | None = None
     git_user_email: str | None = None
+    # Package manager preference (npm or yarn)
+    package_manager: str | None = "npm"
     v1_enabled: bool = True
 
     model_config = ConfigDict(

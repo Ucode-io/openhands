@@ -12,7 +12,7 @@ import { useSubConversationTaskPolling } from "#/hooks/query/use-sub-conversatio
 import { isTaskPolling } from "#/utils/utils";
 import { NotionBugSelector } from "./notion-bug-selector";
 import { NotionTask } from "#/api/notion-service/notion-service.api";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 
 interface InteractiveChatBoxProps {
   onSubmit: (message: string, images: File[], files: File[]) => void;
@@ -157,6 +157,11 @@ export function InteractiveChatBox({ onSubmit }: InteractiveChatBoxProps) {
     handleSubmit(message);
   };
 
+  // Clear selected Notion task
+  const handleClearNotionTask = useCallback(() => {
+    setSelectedNotionTask(null);
+  }, []);
+
   const isDisabled =
     curAgentState === AgentState.LOADING ||
     curAgentState === AgentState.AWAITING_USER_CONFIRMATION ||
@@ -169,10 +174,14 @@ export function InteractiveChatBox({ onSubmit }: InteractiveChatBoxProps) {
         onSubmit={handleSubmit}
         onFilesPaste={handleUpload}
         conversationStatus={conversation?.status || null}
+        selectedNotionTask={selectedNotionTask}
+        onClearNotionTask={handleClearNotionTask}
       />
       <div className="mt-3 flex items-center gap-3">
         <NotionBugSelector
           onSelectTask={handleNotionTaskSelect}
+          selectedTask={selectedNotionTask}
+          onClearTask={handleClearNotionTask}
           className="flex-shrink-0"
         />
         <div className="flex-1">

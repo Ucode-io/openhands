@@ -32,6 +32,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   git_user_name: "openhands",
   git_user_email: "openhands@all-hands.dev",
+  package_manager: "npm",
   v1_enabled: false,
 };
 

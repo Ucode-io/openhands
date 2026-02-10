@@ -123,6 +123,81 @@ class NotionService:
                 return status.get('name')
         return None
 
+    def _get_database_schema(self, database_id: str) -> dict[str, Any]:
+        """Fetch the database schema to understand property types.
+
+        Args:
+            database_id: The Notion database ID
+
+        Returns:
+            Dictionary mapping property names to their types
+        """
+        try:
+            response = self._client.get(f'/databases/{database_id}')
+            response.raise_for_status()
+            data = response.json()
+            properties = data.get('properties', {})
+            return {
+                name: prop.get('type')
+                for name, prop in properties.items()
+            }
+        except httpx.HTTPStatusError as e:
+            logger.warning(f'Failed to fetch database schema: {e}')
+            return {}
+
+    def _build_status_filter(
+        self,
+        schema: dict[str, Any],
+        status_value: str
+    ) -> dict[str, Any] | None:
+        """Build a filter based on actual database schema.
+
+        Args:
+            schema: Database schema mapping property names to types
+            status_value: The status value to filter by
+
+        Returns:
+            Filter dictionary or None if no suitable property found
+        """
+        # Look for status or state properties (case-insensitive)
+        status_props = []
+        for prop_name, prop_type in schema.items():
+            lower_name = prop_name.lower()
+            if lower_name in ('status', 'state', 'stage'):
+                status_props.append((prop_name, prop_type))
+
+        if not status_props:
+            # No status property found, return no filter
+            logger.warning('No status property found in database schema')
+            return None
+
+        # Build OR filter for all matching properties
+        conditions = []
+        for prop_name, prop_type in status_props:
+            if prop_type == 'status':
+                conditions.append({
+                    'property': prop_name,
+                    'status': {'equals': status_value}
+                })
+            elif prop_type == 'select':
+                conditions.append({
+                    'property': prop_name,
+                    'select': {'equals': status_value}
+                })
+            elif prop_type == 'multi_select':
+                conditions.append({
+                    'property': prop_name,
+                    'multi_select': {'contains': status_value}
+                })
+
+        if not conditions:
+            return None
+
+        if len(conditions) == 1:
+            return conditions[0]
+
+        return {'or': conditions}
+
     def list_bugs(
         self,
         database_id: str | None = None,
@@ -143,29 +218,63 @@ class NotionService:
         if not db_id:
             raise ValueError('Database ID is required')
 
-        # Build the filter
-        filter_body: dict[str, Any] = {}
-        if status_filter:
-            filter_body['filter'] = {
-                'or': [
-                    {'property': 'Status', 'status': {'equals': status_filter}},
-                    {'property': 'status', 'status': {'equals': status_filter}},
-                    {'property': 'State', 'select': {'equals': status_filter}},
-                ]
-            }
+        # Build the query body
+        query_body: dict[str, Any] = {
+            'page_size': min(limit, 100)
+        }
 
-        filter_body['page_size'] = min(limit, 100)
+        # Only add filter if status_filter is provided
+        if status_filter:
+            # First, fetch the database schema to understand property types
+            schema = self._get_database_schema(db_id)
+
+            if schema:
+                # Build filter based on actual schema
+                filter_condition = self._build_status_filter(schema, status_filter)
+                if filter_condition:
+                    query_body['filter'] = filter_condition
+            else:
+                # Fallback: try common property names with status type only
+                # (select type queries on non-existent properties cause 400 errors)
+                logger.warning('Could not fetch schema, trying without filter')
 
         try:
             response = self._client.post(
                 f'/databases/{db_id}/query',
-                json=filter_body,
+                json=query_body,
             )
             response.raise_for_status()
             data = response.json()
         except httpx.HTTPStatusError as e:
-            logger.error(f'Failed to query Notion database: {e}')
-            raise RuntimeError(f'Failed to query Notion database: {e}') from e
+            error_detail = ''
+            try:
+                error_body = e.response.json()
+                error_detail = error_body.get('message', '')
+            except Exception:
+                pass
+
+            # If we get a 400 error with a filter, try again without the filter
+            # This can happen when the status value doesn't exist in Notion's options
+            if e.response.status_code == 400 and 'filter' in query_body:
+                logger.warning(
+                    f'Status filter "{status_filter}" may not exist in database. '
+                    f'Fetching all tasks instead. Notion error: {error_detail}'
+                )
+                # Retry without filter
+                query_body_no_filter = {'page_size': min(limit, 100)}
+                try:
+                    response = self._client.post(
+                        f'/databases/{db_id}/query',
+                        json=query_body_no_filter,
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+                except httpx.HTTPStatusError as retry_e:
+                    logger.error(f'Failed to query Notion database even without filter: {retry_e}')
+                    raise RuntimeError(f'Failed to query Notion database: {retry_e}') from retry_e
+            else:
+                logger.error(f'Failed to query Notion database: {e}: {error_detail}')
+                raise RuntimeError(f'Failed to query Notion database: {e}: {error_detail}') from e
 
         bugs: list[NotionBug] = []
         for page in data.get('results', []):

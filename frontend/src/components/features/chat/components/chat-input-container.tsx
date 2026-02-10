@@ -5,6 +5,9 @@ import { ChatInputRow } from "./chat-input-row";
 import { ChatInputActions } from "./chat-input-actions";
 import { useConversationStore } from "#/stores/conversation-store";
 import { cn } from "#/utils/utils";
+import { SiNotion } from "react-icons/si";
+import { FiX } from "react-icons/fi";
+import { NotionTask } from "#/api/notion-service/notion-service.api";
 
 interface ChatInputContainerProps {
   chatContainerRef: React.RefObject<HTMLDivElement | null>;
@@ -24,6 +27,8 @@ interface ChatInputContainerProps {
   onKeyDown: (e: React.KeyboardEvent) => void;
   onFocus?: () => void;
   onBlur?: () => void;
+  selectedNotionTask?: NotionTask | null;
+  onClearNotionTask?: () => void;
 }
 
 export function ChatInputContainer({
@@ -44,6 +49,8 @@ export function ChatInputContainer({
   onKeyDown,
   onFocus,
   onBlur,
+  selectedNotionTask,
+  onClearNotionTask,
 }: ChatInputContainerProps) {
   const conversationMode = useConversationStore(
     (state) => state.conversationMode,
@@ -69,6 +76,29 @@ export function ChatInputContainer({
       {isDragOver && <DragOver />}
 
       <UploadedFiles />
+
+      {/* Selected Notion Task Pill */}
+      {selectedNotionTask && (
+        <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg bg-gradient-to-r from-blue-500/15 to-purple-500/15 border border-blue-500/30">
+          <SiNotion className="w-4 h-4 text-blue-400 flex-shrink-0" />
+          <span className="text-sm text-zinc-200 truncate flex-1">
+            {selectedNotionTask.title}
+          </span>
+          {selectedNotionTask.status && (
+            <span className="px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide rounded-full bg-yellow-500/20 text-yellow-400 flex-shrink-0">
+              {selectedNotionTask.status}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={onClearNotionTask}
+            className="p-1 hover:bg-zinc-700/50 rounded-md transition-colors flex-shrink-0"
+            title="Clear selected task"
+          >
+            <FiX className="w-3.5 h-3.5 text-zinc-400 hover:text-white" />
+          </button>
+        </div>
+      )}
 
       <ChatInputRow
         chatInputRef={chatInputRef}
