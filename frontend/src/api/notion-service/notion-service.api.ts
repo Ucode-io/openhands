@@ -61,10 +61,12 @@ class NotionTaskService {
    * Fetch tasks from the configured Notion database
    * @param statusFilter - Optional filter by status (e.g., 'To Do', 'Bug')
    * @param limit - Maximum number of tasks to return
+   * @param credentials - Optional project credentials override
    */
   static async getTasks(
     statusFilter?: string,
     limit: number = 100,
+    credentials?: { token: string; databaseId: string },
   ): Promise<NotionTask[]> {
     const params = new URLSearchParams();
     if (statusFilter) {
@@ -72,9 +74,18 @@ class NotionTaskService {
     }
     params.append("limit", limit.toString());
 
+    // Prepare headers if credentials are provided
+    const config = credentials ? {
+      headers: {
+        'X-Notion-Token': credentials.token,
+        'X-Notion-Database-Id': credentials.databaseId
+      }
+    } : undefined;
+
     try {
       const response = await openHands.get<NotionTaskListResponse | ErrorResponse>(
         `/api/notion/tasks?${params.toString()}`,
+        config
       );
 
       // Check if the response is an error
@@ -100,11 +111,13 @@ class NotionTaskService {
    * @param pageId - The Notion page ID
    * @param status - The new status value (e.g., 'Done', 'In Progress')
    * @param statusPropertyName - Name of the status property (default: 'Status')
+   * @param credentials - Optional project credentials override
    */
   static async updateStatus(
     pageId: string,
     status: string,
     statusPropertyName: string = "Status",
+    credentials?: { token: string; databaseId: string },
   ): Promise<UpdateStatusResponse> {
     const request: UpdateStatusRequest = {
       page_id: pageId,
@@ -112,10 +125,19 @@ class NotionTaskService {
       status_property_name: statusPropertyName,
     };
 
+    // Prepare headers if credentials are provided
+    const config = credentials ? {
+      headers: {
+        'X-Notion-Token': credentials.token,
+        'X-Notion-Database-Id': credentials.databaseId
+      }
+    } : undefined;
+
     try {
       const response = await openHands.post<UpdateStatusResponse | ErrorResponse>(
         "/api/notion/update-status",
         request,
+        config
       );
 
       if ('error' in response.data) {
@@ -136,10 +158,22 @@ class NotionTaskService {
 
   /**
    * Test the connection to Notion API
+   * @param credentials - Optional project credentials to test specific project
    */
-  static async testConnection(): Promise<ConnectionTestResponse> {
+  static async testConnection(
+    credentials?: { token: string; databaseId: string }
+  ): Promise<ConnectionTestResponse> {
+    // Prepare headers if credentials are provided
+    const config = credentials ? {
+      headers: {
+        'X-Notion-Token': credentials.token,
+        'X-Notion-Database-Id': credentials.databaseId
+      }
+    } : undefined;
+
     const { data } = await openHands.get<ConnectionTestResponse>(
       "/api/notion/test-connection",
+      config
     );
     return data;
   }

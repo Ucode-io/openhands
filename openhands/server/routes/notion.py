@@ -8,9 +8,9 @@
 # This module belongs to the old V0 web server. The V1 application server lives under openhands/app_server/.
 """API routes for Notion bug tracking integration."""
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Header
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, SecretStr
 
 from openhands.core.logger import openhands_logger as logger
 from openhands.integrations.notion.notion_service import NotionService
@@ -67,6 +67,8 @@ async def get_notion_tasks(
     status_filter: str | None = None,
     limit: int = 100,
     settings: Settings = Depends(get_user_settings),
+    x_notion_token: str | None = Header(None, alias='X-Notion-Token'),
+    x_notion_database_id: str | None = Header(None, alias='X-Notion-Database-Id'),
 ) -> NotionTaskListResponse | JSONResponse:
     """
     Fetch tasks from the configured Notion database.
@@ -75,25 +77,32 @@ async def get_notion_tasks(
         status_filter: Optional filter by status (e.g., 'To Do', 'Bug')
         limit: Maximum number of tasks to return (default: 100)
         settings: User settings containing Notion credentials
+        x_notion_token: Optional header to override Notion token
+        x_notion_database_id: Optional header to override Notion database ID
 
     Returns:
         List of Notion tasks with ID, title, description, etc.
     """
     try:
-        # Check if Notion is configured
-        if not settings:
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content={'error': 'Settings not found'},
-            )
+        # Determine credentials (headers take precedence)
+        api_key = x_notion_token
+        database_id = x_notion_database_id
 
-        if not settings.notion_api_key:
+        # Fallback to settings if headers are missing
+        if not api_key and settings and settings.notion_api_key:
+            api_key = settings.notion_api_key
+
+        if not database_id and settings and settings.notion_database_id:
+            database_id = settings.notion_database_id
+
+        # Check configuration
+        if not api_key:
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content={'error': 'Notion API key not configured'},
             )
 
-        if not settings.notion_database_id:
+        if not database_id:
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content={'error': 'Notion database ID not configured'},
@@ -101,8 +110,8 @@ async def get_notion_tasks(
 
         # Create Notion service and fetch tasks
         notion_service = NotionService(
-            api_key=settings.notion_api_key,
-            database_id=settings.notion_database_id,
+            api_key=api_key,
+            database_id=database_id,
         )
 
         bugs = notion_service.list_bugs(
@@ -156,6 +165,8 @@ async def get_notion_tasks(
 async def update_notion_status(
     request: UpdateStatusRequest,
     settings: Settings = Depends(get_user_settings),
+    x_notion_token: str | None = Header(None, alias='X-Notion-Token'),
+    x_notion_database_id: str | None = Header(None, alias='X-Notion-Database-Id'),
 ) -> UpdateStatusResponse | JSONResponse:
     """
     Update the status of a Notion task.
@@ -163,19 +174,25 @@ async def update_notion_status(
     Args:
         request: Contains page_id, status, and optional status_property_name
         settings: User settings containing Notion credentials
+        x_notion_token: Optional header to override Notion token
+        x_notion_database_id: Optional header to override Notion database ID
 
     Returns:
         Success response or error message
     """
     try:
-        # Check if Notion is configured
-        if not settings:
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content={'error': 'Settings not found'},
-            )
+        # Determine credentials (headers take precedence)
+        api_key = x_notion_token
+        database_id = x_notion_database_id
 
-        if not settings.notion_api_key:
+        # Fallback to settings if headers are missing
+        if not api_key and settings and settings.notion_api_key:
+            api_key = settings.notion_api_key
+
+        if not database_id and settings and settings.notion_database_id:
+            database_id = settings.notion_database_id
+
+        if not api_key:
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content={'error': 'Notion API key not configured'},
@@ -183,8 +200,8 @@ async def update_notion_status(
 
         # Create Notion service and update status
         notion_service = NotionService(
-            api_key=settings.notion_api_key,
-            database_id=settings.notion_database_id,
+            api_key=api_key,
+            database_id=database_id,
         )
 
         success = notion_service.update_bug_status(
@@ -228,39 +245,47 @@ async def update_notion_status(
 )
 async def test_notion_connection(
     settings: Settings = Depends(get_user_settings),
+    x_notion_token: str | None = Header(None, alias='X-Notion-Token'),
+    x_notion_database_id: str | None = Header(None, alias='X-Notion-Database-Id'),
 ) -> JSONResponse:
     """
     Test the connection to Notion API.
 
     Args:
         settings: User settings containing Notion credentials
+        x_notion_token: Optional header to override Notion token
+        x_notion_database_id: Optional header to override Notion database ID
 
     Returns:
         Connection test result
     """
     try:
-        # Check if Notion is configured
-        if not settings:
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content={'connected': False, 'error': 'Settings not found'},
-            )
+        # Determine credentials (headers take precedence)
+        api_key = x_notion_token
+        database_id = x_notion_database_id
 
-        if not settings.notion_api_key:
+        # Fallback to settings if headers are missing
+        if not api_key and settings and settings.notion_api_key:
+            api_key = settings.notion_api_key
+
+        if not database_id and settings and settings.notion_database_id:
+            database_id = settings.notion_database_id
+
+        if not api_key:
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content={'connected': False, 'error': 'Notion API key not configured'},
             )
 
         # Debug: Log API key info (only first/last few chars for security)
-        api_key_value = settings.notion_api_key.get_secret_value() if hasattr(settings.notion_api_key, 'get_secret_value') else str(settings.notion_api_key)
+        api_key_value = api_key.get_secret_value() if isinstance(api_key, SecretStr) else str(api_key)
         key_preview = f'{api_key_value[:8]}...{api_key_value[-4:]}' if len(api_key_value) > 12 else '***'
-        logger.info(f'Testing Notion connection with key: {key_preview}, database: {settings.notion_database_id}')
+        logger.info(f'Testing Notion connection with key: {key_preview}, database: {database_id}')
 
         # Create Notion service and test connection
         notion_service = NotionService(
-            api_key=settings.notion_api_key,
-            database_id=settings.notion_database_id,
+            api_key=api_key,
+            database_id=database_id,
         )
 
         is_connected, error_message = notion_service.test_connection()

@@ -1,5 +1,6 @@
 import React from "react";
 import { useLocation, NavLink } from "react-router";
+
 import { useTranslation } from "react-i18next";
 import { useGitUser } from "#/hooks/query/use-git-user";
 import { UserActions } from "./user-actions";
@@ -178,6 +179,8 @@ export function Sidebar() {
                 {t(I18nKey.SETTINGS$TITLE)}
               </span>
             </NavLink>
+
+
           </div>
 
           <div className="flex flex-row md:flex-col md:items-stretch gap-6">
