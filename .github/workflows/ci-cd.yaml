@@ -13,13 +13,14 @@ jobs:
   build:
     if: github.ref_name == 'main'
     uses: Ucode-io/ci-cd/.github/workflows/build.yml@main
-    with:
-      ENVIRONMENT: production
-      ENV_TAG: latest
+
     secrets: inherit
 
   deploy:
     needs: build
     if: github.ref_name == 'main'
     uses: Ucode-io/ci-cd/.github/workflows/deploy_server.yml@main
+    with:
+      ENVIRONMENT: production
+      ENV_TAG: latest
     secrets: inherit
